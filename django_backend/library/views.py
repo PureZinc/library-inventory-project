@@ -60,26 +60,26 @@ class RentBookView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        if serializer.is_valid():
-            user = self.request.user.id
-            membership = UserMembership.objects.get(user=user)
-            if membership.is_member:
-                try:
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        
+        user = self.request.user.id
+        membership = UserMembership.objects.get(user=user)
 
-                    book = Book.objects.get(id=serializer.validated_data["book"].id)
-                    if book.stock > 0:
-                        Book.objects.filter(id=book.id).update(stock=F("stock") - 1)
-
-                        BookTracker.objects.create(user=membership, book=book)
-                        return Response({"message": "Successfully rented book"}, status=200)
-                    
-                except Book.DoesNotExist:
-                    raise Http404("Book does not exist")
-                
-                return Response({"message": "Book is out of stock"}, status=400)
+        if not membership.is_member:
             return Response({"message": "Only members can rent books!"}, status=400)
-        else:
-            Response(serializer.errors, status=400)
+        
+        try:
+            book = Book.objects.get(id=serializer.validated_data["book"].id)
+            if book.stock <= 0:
+                return Response({"message": "Book is out of stock"}, status=400)
+            
+            Book.objects.filter(id=book.id).update(stock=F("stock") - 1)
+            BookTracker.objects.create(user=membership, book=book)
+            return Response({"message": "Successfully rented book"}, status=200)
+                    
+        except Book.DoesNotExist:
+            raise Http404("Book does not exist")
 
 
 class ReturnBookView(generics.DestroyAPIView):
@@ -99,4 +99,4 @@ class ReturnBookView(generics.DestroyAPIView):
             return Response({"message": "Instance deleted successfully"}, status=204)
         except Exception as e:
             print(e)
-            return Response({"message": f"{e}"}, status=400)
+            return Response({"message": "Something Wrong happened to the server!"}, status=400)

@@ -1,8 +1,10 @@
 from rest_framework import serializers as ser
 from .models import Book, UserMembership, BookTracker
 from django.contrib.auth.models import User
+from django.contrib.auth import authenticate, login, logout
 
 
+# For authentication
 class UserSer(ser.ModelSerializer):
     class Meta:
         model = User
@@ -14,6 +16,27 @@ class UserSer(ser.ModelSerializer):
         return user
 
 
+class LoginSer(ser.Serializer):
+    username = ser.CharField()
+    password = ser.CharField(write_only=True)
+
+    def validate(self, data):
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username and password:
+            raise ser.ValidationError("Both username and password are required")
+        
+        user = authenticate(username=username, password=password)
+
+        if not user:
+            raise ser.ValidationError("Invalid credentials")
+
+        data['user'] = user
+        return data
+
+
+# For everything else
 class UserMembershipSer(ser.ModelSerializer):
     class Meta:
         model = UserMembership
